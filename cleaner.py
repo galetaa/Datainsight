@@ -1,7 +1,8 @@
-from pandas import DataFrame, Series
-import pandas as pd
-import numpy as np
 from typing import Literal
+
+import numpy as np
+import pandas as pd
+from pandas import DataFrame, Series
 
 
 class Cleaner:
@@ -97,7 +98,7 @@ class Cleaner:
             duplicate_mask = df.duplicated(keep=keep)
         return df.loc[duplicate_mask]
 
-    def drop_duplicates(self, column: str | None = None, keep: Literal['first', 'last', False] = 'first'):
+    def clean_duplicates(self, column: str | None = None, keep: Literal['first', 'last', False] = 'first'):
         df = self.data
         if column:
             if column not in df.columns:
