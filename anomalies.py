@@ -7,14 +7,6 @@ from sklearn.svm import OneClassSVM
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 
-def one_class_svm(teacher: DataFrame, df: DataFrame, **kwargs):
-    model = OneClassSVM(**kwargs)
-    model.fit(teacher)
-    predictions = model.predict(df)
-    anomalies = df[predictions == -1]
-    return anomalies
-
-
 class AnomaliesDetector:
     def __init__(self, data: DataFrame | None = None):
         self.data = data
