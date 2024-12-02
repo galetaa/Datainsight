@@ -2,15 +2,15 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series
 from pandas import DataFrame
+from pandas import Series
 from scipy.stats import zscore
 from sklearn.cluster import DBSCAN
 from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import OneClassSVM
 from statsmodels.tsa.seasonal import seasonal_decompose
-from sklearn.preprocessing import LabelEncoder
 
 
 class BaseTool:
@@ -27,7 +27,7 @@ class Cleaner(BaseTool):
         whitespace_mask: DataFrame = DataFrame()
         if not (column is None):
             if column not in df.columns:
-                raise ValueError(f"Столбец '{column}' не найден в DataFrame.")
+                raise ValueError(f"Column: '{column}' not found in DataFrame.")
             nan_mask = df[column].isna()
             if not only_nan:
                 whitespace_mask = df[column].apply(lambda x: isinstance(x, str) and x.strip() == "")
@@ -44,7 +44,7 @@ class Cleaner(BaseTool):
         df: DataFrame = self.data
         if not (column is None):
             if column not in df.columns:
-                raise ValueError(f"Столбец '{column}' не найден в DataFrame.")
+                raise ValueError(f"Column: '{column}' not found in DataFrame.")
 
         mask = self.find_missing_values(column=column, only_nan=only_nan)
 
@@ -68,11 +68,11 @@ class Cleaner(BaseTool):
             return series.mode().iloc[0] if not series.mode().empty else np.nan
         elif method == "constant":
             if value is None:
-                raise ValueError("Для метода 'constant' требуется параметр `value`.")
+                raise ValueError("Method 'constant' requires parameter 'value'")
             return value
         else:
             raise ValueError(
-                f"Неверный метод заполнения: '{method}'. Доступные методы: mean, median, min, max, mode, constant.")
+                f"Incorrect filling method: '{method}'. Available methods: mean, median, min, max, mode, constant.")
 
     def fill_numeric_missing(self, column: str | None = None,
                              method: Literal["mean", "median", "min", "max", "mode", "constant"] = "mean",
@@ -82,7 +82,7 @@ class Cleaner(BaseTool):
 
         if column:
             if column not in df.columns:
-                raise ValueError(f"Столбец '{column}' не найден в DataFrame.")
+                raise ValueError(f"Column: '{column}' not found in DataFrame.")
 
             if pd.api.types.is_numeric_dtype(df[column]):
                 fill_value = self.__get_fill_value(df[column], method, value)
@@ -102,7 +102,7 @@ class Cleaner(BaseTool):
         df = self.data
         if column:
             if column not in df.columns:
-                raise ValueError(f"Столбец '{column}' не найден в DataFrame.")
+                raise ValueError(f"Column: '{column}' not found in DataFrame.")
             duplicate_mask = df.duplicated(subset=[column], keep=keep)
         else:
             duplicate_mask = df.duplicated(keep=keep)
@@ -112,7 +112,7 @@ class Cleaner(BaseTool):
         df = self.data
         if column:
             if column not in df.columns:
-                raise ValueError(f"Столбец '{column}' не найден в DataFrame.")
+                raise ValueError(f"Column: '{column}' not found in DataFrame.")
             return df.drop_duplicates(subset=[column], keep=keep)
         else:
             return df.drop_duplicates(keep=keep)
@@ -205,7 +205,7 @@ class AnomaliesDetector(BaseTool):
         elif method == 'stl':
             return self.detect_anomalies_stl(column, **kwargs)
         else:
-            raise ValueError(f"Метод '{method}' не поддерживается.")
+            raise ValueError(f"Method: '{method}' not supported.")
 
 
 class Normalizer(BaseTool):
@@ -274,7 +274,7 @@ class Normalizer(BaseTool):
         elif method == 'log':
             return self.log_transform(columns)
         else:
-            raise ValueError(f"Метод '{method}' не поддерживается.")
+            raise ValueError(f"Method: '{method}' not supported.")
 
 
 class Converter(BaseTool):
@@ -290,7 +290,7 @@ class Converter(BaseTool):
                 df[col] = pd.to_numeric(df[col], errors='raise')  # Преобразуем в числовой формат
             except ValueError:
                 if errors == 'raise':
-                    raise ValueError(f"Невозможно преобразовать столбец '{col}' в числовой тип.")
+                    raise ValueError(f"Cannot convert column: '{col}'  to numeric type.")
                 else:
                     # Если ошибка, пропускаем этот столбец
                     pass
