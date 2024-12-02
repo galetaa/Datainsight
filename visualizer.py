@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataVisualizer:
-    def __init__(self, data, plot_type='line', x=None, y=None, width=None, height=None, size=None, title='', **kwargs):
+    def __init__(self, data, plot_type='line', x=None, y=None, width=None, height=None, size=None, **kwargs):
         self.data = data
         self.plot_type = plot_type
         self.x = x
@@ -18,7 +18,6 @@ class DataVisualizer:
         self.width = width
         self.height = height
         self.size = size
-        self.title = title
         self.kwargs = kwargs
 
         self.validate_input()
@@ -41,50 +40,42 @@ class DataVisualizer:
         logger.info(f"Creating a chart type '{self.plot_type}' with parameters: {self.kwargs}")
 
         if self.plot_type == 'line':
-            fig = px.line(self.data, x=self.x, y=self.y, width=self.width, height=self.height,
-                          title=self.title, **self.kwargs)
+            fig = px.line(self.data, x=self.x, y=self.y, width=self.width, height=self.height, **self.kwargs)
 
         elif self.plot_type == 'scatter':
             fig = px.scatter(self.data, x=self.x, y=self.y, width=self.width, height=self.height,
-                             size=self.size, title=self.title, **self.kwargs)
+                             size=self.size, **self.kwargs)
 
         elif self.plot_type == 'histogram':
-            fig = px.histogram(self.data, x=self.x, width=self.width, height=self.height, title=self.title,
-                               **self.kwargs)
+            fig = px.histogram(self.data, x=self.x, width=self.width, height=self.height,**self.kwargs)
 
         elif self.plot_type == 'bar':
-            fig = px.bar(self.data, x=self.x, y=self.y, width=self.width, height=self.height, title=self.title,
-                         **self.kwargs)
+            fig = px.bar(self.data, x=self.x, y=self.y, width=self.width, height=self.height,**self.kwargs)
 
         elif self.plot_type == 'box':
-            fig = px.box(self.data, x=self.x, y=self.y, width=self.width, height=self.height, title=self.title,
-                         **self.kwargs)
+            fig = px.box(self.data, x=self.x, y=self.y, width=self.width, height=self.height, **self.kwargs)
 
         elif self.plot_type == 'violin':
-            fig = px.violin(self.data, x=self.x, y=self.y, width=self.width, height=self.height, title=self.title,
-                            **self.kwargs)
+            fig = px.violin(self.data, x=self.x, y=self.y, width=self.width, height=self.height, **self.kwargs)
 
         elif self.plot_type == 'heatmap':
-            fig = px.imshow(self.data, width=self.width, height=self.height, title=self.title, **self.kwargs)
+            fig = px.imshow(self.data, width=self.width, height=self.height, **self.kwargs)
 
         elif self.plot_type == 'pie':
-            fig = px.pie(self.data, names=self.x, values=self.y, width=self.width, height=self.height, title=self.title,
-                         **self.kwargs)
+            fig = px.pie(self.data, names=self.x, values=self.y, width=self.width, height=self.height,**self.kwargs)
 
         elif self.plot_type == 'sunburst':
-            fig = px.sunburst(self.data, path=self.x, width=self.width, height=self.height, values=self.y,
-                              title=self.title, **self.kwargs)
+            fig = px.sunburst(self.data, path=self.x, width=self.width, height=self.height, values=self.y, **self.kwargs)
 
         elif self.plot_type == 'treemap':
-            fig = px.treemap(self.data, path=self.x, width=self.width, height=self.height, values=self.y,
-                             title=self.title, **self.kwargs)
+            fig = px.treemap(self.data, path=self.x, width=self.width, height=self.height, values=self.y, **self.kwargs)
 
         elif self.plot_type == 'scatter_geo':
             fig = px.scatter_geo(self.data, lat=self.kwargs.pop('lat'), lon=self.kwargs.pop('lon'), width=self.width,
-                                 height=self.height, size=self.size, title=self.title, **self.kwargs)
+                                 height=self.height, size=self.size, **self.kwargs)
 
         elif self.plot_type == 'image':
-            fig = px.imshow(self.data, width=self.width, height=self.height, title=self.title, **self.kwargs)
+            fig = px.imshow(self.data, width=self.width, height=self.height, **self.kwargs)
 
         elif self.plot_type == 'candlestick':
             fig = go.Figure(data=[go.Candlestick(
@@ -95,7 +86,7 @@ class DataVisualizer:
                 close=self.data[self.kwargs.pop('close', None)],
             )])
 
-            fig.update_layout(title=self.title, width=self.width, height=self.height)
+            fig.update_layout(width=self.width, height=self.height)
         else:
             raise ValueError(f"Unsupported chart type: {self.plot_type}")
 
