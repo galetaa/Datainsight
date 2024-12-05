@@ -130,10 +130,10 @@ class AnomaliesDetector(BaseTool):
     def detect_anomalies_iqr(self, column):
         df = self.data
 
-        Q1 = df[column].quantile(0.25)
-        Q3 = df[column].quantile(0.75)
-        IQR = Q3 - Q1
-        anomalies = df[(df[column] < Q1 - 1.5 * IQR) | (df[column] > Q3 + 1.5 * IQR)]
+        q1 = df[column].quantile(0.25)
+        q3 = df[column].quantile(0.75)
+        iqr = q3 - q1
+        anomalies = df[(df[column] < q1 - 1.5 * iqr) | (df[column] > q3 + 1.5 * iqr)]
         return anomalies
 
     def detect_anomalies_zscore(self, column, threshold=3):
@@ -247,8 +247,8 @@ class Normalizer(BaseTool):
         # Применяем к каждому столбцу медиану и межквартильный размах
         for col in columns:
             median = df[col].median()
-            IQR = df[col].quantile(0.75) - df[col].quantile(0.25)
-            df[col] = (df[col] - median) / IQR
+            iqr = df[col].quantile(0.75) - df[col].quantile(0.25)
+            df[col] = (df[col] - median) / iqr
 
         return df
 

@@ -8,3 +8,4 @@ seaborn
 plotly
 dash
 kaleido
+pytest

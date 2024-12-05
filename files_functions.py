@@ -1,6 +1,7 @@
-import pandas as pd
-from collections import Counter
 import json
+from collections import Counter
+
+import pandas as pd
 
 
 def get_delimiter(file_name, max_sample_lines=10):
