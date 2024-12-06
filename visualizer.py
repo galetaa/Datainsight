@@ -11,7 +11,9 @@ class DataValidator:
     def validate_1d_data(data: Union[List, np.ndarray, pd.Series],
                          min_points: int = 2,
                          max_outlier_percentage: float = 10) -> dict:
+
         data_array = np.array(data, dtype=float)
+
         validation_result = {
             'is_valid': True,
             'errors': []
@@ -54,6 +56,7 @@ class DataValidator:
     def validate_2d_data(x: Union[List, np.ndarray, pd.Series],
                          y: Union[List, np.ndarray, pd.Series],
                          plot_type: str = 'scatter') -> dict:
+
         x_array = np.array(x, dtype=float)
         y_array = np.array(y, dtype=float)
         validation_result = {
@@ -149,7 +152,7 @@ class Visualizer:
         self.validation_result: Optional[dict] = None
         self.plot_params = {}  # Хранение дополнительных параметров для построения графика
 
-    def set_data(self, x=None, y=None, z=None):
+    def load_data(self, x=None, y=None, z=None):
         self.x = x
         self.y = y
         self.z = z

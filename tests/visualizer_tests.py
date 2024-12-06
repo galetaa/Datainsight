@@ -67,89 +67,89 @@ class TestVisualizerValidData(unittest.TestCase):
     """Тесты корректных данных для всех поддерживаемых типов визуализаций."""
 
     def test_histogram(self):
-        v = Visualizer("histogram").set_data(x=generate_random_data(n=100))
+        v = Visualizer("histogram").load_data(x=generate_random_data(n=100))
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test histogram")
         self.assertIsNotNone(fig)
 
     def test_kde(self):
-        v = Visualizer("kde").set_data(x=generate_random_data(n=200))
+        v = Visualizer("kde").load_data(x=generate_random_data(n=200))
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test kde")
         self.assertIsNotNone(fig)
 
     def test_distribution(self):
-        v = Visualizer("distribution").set_data(x=generate_random_data(n=50))
+        v = Visualizer("distribution").load_data(x=generate_random_data(n=50))
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test distribution")
         self.assertIsNotNone(fig)
 
     def test_scatter(self):
         x, y = generate_linear_data(n=50)
-        v = Visualizer("scatter").set_data(x=x, y=y)
+        v = Visualizer("scatter").load_data(x=x, y=y)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test scatter")
         self.assertIsNotNone(fig)
 
     def test_line(self):
         x, y = generate_linear_data(n=50)
-        v = Visualizer("line").set_data(x=x, y=y)
+        v = Visualizer("line").load_data(x=x, y=y)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test line")
         self.assertIsNotNone(fig)
 
     def test_bar(self):
         x, y = generate_linear_data(n=10)
-        v = Visualizer("bar").set_data(x=x, y=y)
+        v = Visualizer("bar").load_data(x=x, y=y)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test bar")
         self.assertIsNotNone(fig)
 
     def test_area(self):
         x, y = generate_linear_data(n=50)
-        v = Visualizer("area").set_data(x=x, y=y)
+        v = Visualizer("area").load_data(x=x, y=y)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test area")
         self.assertIsNotNone(fig)
 
     def test_box(self):
         x, y = generate_linear_data(n=50)
-        v = Visualizer("box").set_data(x=x, y=y)
+        v = Visualizer("box").load_data(x=x, y=y)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test box")
         self.assertIsNotNone(fig)
 
     def test_violin(self):
         x, y = generate_linear_data(n=50)
-        v = Visualizer("violin").set_data(x=x, y=y)
+        v = Visualizer("violin").load_data(x=x, y=y)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test violin")
         self.assertIsNotNone(fig)
 
     def test_scatter3d(self):
         x, y, z = generate_3d_scatter_data(n=30)
-        v = Visualizer("scatter3d").set_data(x=x, y=y, z=z)
+        v = Visualizer("scatter3d").load_data(x=x, y=y, z=z)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test scatter3d")
         self.assertIsNotNone(fig)
 
     def test_surface(self):
         z = generate_3d_surface_data(nx=20, ny=20)
-        v = Visualizer("surface").set_data(z=z)
+        v = Visualizer("surface").load_data(z=z)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test surface")
         self.assertIsNotNone(fig)
 
     def test_contour(self):
         z = generate_3d_surface_data(nx=20, ny=20)
-        v = Visualizer("contour").set_data(z=z)
+        v = Visualizer("contour").load_data(z=z)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test contour")
         self.assertIsNotNone(fig)
 
     def test_heatmap(self):
         z = generate_3d_surface_data(nx=20, ny=20)
-        v = Visualizer("heatmap").set_data(z=z)
+        v = Visualizer("heatmap").load_data(z=z)
         self.assertTrue(v.validate())
         fig = v.get_figure(title="Test heatmap")
         self.assertIsNotNone(fig)
@@ -160,38 +160,38 @@ class TestVisualizerInvalidData(unittest.TestCase):
 
     # 1D
     def test_histogram_few_points(self):
-        v = Visualizer("histogram").set_data(x=[1])
+        v = Visualizer("histogram").load_data(x=[1])
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     def test_1d_data_nan(self):
-        v = Visualizer("histogram").set_data(x=generate_nan_data())
+        v = Visualizer("histogram").load_data(x=generate_nan_data())
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     def test_1d_data_inf(self):
-        v = Visualizer("kde").set_data(x=generate_inf_data())
+        v = Visualizer("kde").load_data(x=generate_inf_data())
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     def test_1d_data_outliers(self):
-        v = Visualizer("distribution").set_data(x=generate_data_with_outliers(n=100, n_outliers=20))
+        v = Visualizer("distribution").load_data(x=generate_data_with_outliers(n=100, n_outliers=20))
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     def test_1d_data_non_numeric(self):
-        v = Visualizer("histogram").set_data(x=generate_non_numeric_data())
+        v = Visualizer("histogram").load_data(x=generate_non_numeric_data())
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     # 2D
     def test_2d_mismatch_length(self):
-        v = Visualizer("scatter").set_data(x=[1, 2, 3], y=[1, 2])
+        v = Visualizer("scatter").load_data(x=[1, 2, 3], y=[1, 2])
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
@@ -200,7 +200,7 @@ class TestVisualizerInvalidData(unittest.TestCase):
         x = np.linspace(0, 10, 10)
         y = np.linspace(0, 10, 10)
         y[5] = np.nan
-        v = Visualizer("line").set_data(x=x, y=y)
+        v = Visualizer("line").load_data(x=x, y=y)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
@@ -209,7 +209,7 @@ class TestVisualizerInvalidData(unittest.TestCase):
         x = np.linspace(0, 10, 10)
         y = np.linspace(0, 10, 10)
         y[-1] = np.inf
-        v = Visualizer("bar").set_data(x=x, y=y)
+        v = Visualizer("bar").load_data(x=x, y=y)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
@@ -217,14 +217,14 @@ class TestVisualizerInvalidData(unittest.TestCase):
     def test_2d_non_numeric(self):
         x = ["a", "b", "c"]
         y = [1, 2, 3]
-        v = Visualizer("area").set_data(x=x, y=y)
+        v = Visualizer("area").load_data(x=x, y=y)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     def test_2d_non_monotonic_line(self):
         x, y = generate_non_monotonic_x()
-        v = Visualizer("line").set_data(x=x, y=y)
+        v = Visualizer("line").load_data(x=x, y=y)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
@@ -234,7 +234,7 @@ class TestVisualizerInvalidData(unittest.TestCase):
         x = [1, 2, 3]
         y = [4, 5, 6, 7]  # extra point
         z = [7, 8, 9]
-        v = Visualizer("scatter3d").set_data(x=x, y=y, z=z)
+        v = Visualizer("scatter3d").load_data(x=x, y=y, z=z)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
@@ -242,14 +242,14 @@ class TestVisualizerInvalidData(unittest.TestCase):
     def test_3d_scatter_nan(self):
         x, y, z = generate_3d_scatter_data(n=10)
         z[3] = np.nan
-        v = Visualizer("scatter3d").set_data(x=x, y=y, z=z)
+        v = Visualizer("scatter3d").load_data(x=x, y=y, z=z)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     def test_3d_surface_not_2d(self):
         z = np.linspace(0, 10, 10)  # 1D массив вместо 2D
-        v = Visualizer("surface").set_data(z=z)
+        v = Visualizer("surface").load_data(z=z)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
@@ -257,14 +257,14 @@ class TestVisualizerInvalidData(unittest.TestCase):
     def test_3d_contour_inf(self):
         z = generate_3d_surface_data(10, 10)
         z[0, 0] = np.inf
-        v = Visualizer("contour").set_data(z=z)
+        v = Visualizer("contour").load_data(z=z)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
 
     def test_3d_heatmap_non_numeric(self):
         z = np.array([["a", "b"], ["c", "d"]])
-        v = Visualizer("heatmap").set_data(z=z)
+        v = Visualizer("heatmap").load_data(z=z)
         self.assertFalse(v.validate())
         with self.assertRaises(ValueError):
             v.plot()
@@ -300,7 +300,7 @@ class TestCombinedFiguresOnOnePage(unittest.TestCase):
 
         for vis_type, data_params in visualization_types:
             v = Visualizer(vis_type)
-            v.set_data(**data_params)
+            v.load_data(**data_params)
             if v.validate():
                 fig = v.get_figure(title=f"{vis_type.capitalize()} Chart")
                 # Конвертируем фигуру в HTML
