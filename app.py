@@ -1,358 +1,379 @@
-import base64
-import io
-
 import dash
+import dash_bootstrap_components as dbc
+from dash import html, dcc, Input, Output, State, dash_table, callback_context
 import pandas as pd
-import plotly.express as px
-from dash import dcc, html, Input, Output, State, dash_table
-from dash.exceptions import PreventUpdate
+import io
+import base64
 
-from tools import Cleaner, Normalizer
+# Импорт ранее созданных классов
+from data_viewer import DataViewer
+from tools import Cleaner
+from tools import Normalizer
 from visualizer import Visualizer
 
-app = dash.Dash(__name__, suppress_callback_exceptions=True, prevent_initial_callbacks=True)
 
-app.layout = html.Div([
-    dcc.Location(id='url', refresh=False),
+class DataInsightApp:
+    def __init__(self):
+        self.app = dash.Dash(__name__,prevent_initial_callbacks=True,
+                             external_stylesheets=[dbc.themes.BOOTSTRAP],
+                             suppress_callback_exceptions=True)
+        self.current_dataframe = None
+        self.setup_layout()
+        self.register_callbacks()
 
-    html.Div("DataInsight - Анализ и визуализация данных",
-             style={'fontSize': 24, 'fontWeight': 'bold', 'marginBottom': 20}),
+    def setup_layout(self):
+        self.app.layout = dbc.Container([
+            # Заголовок приложения
+            dbc.Row([
+                dbc.Col(html.H1("DataInsight", className="text-center my-4"), width=12)
+            ]),
 
-    # Добавляем Store для хранения данных
-    dcc.Store(id='stored-data-original'),  # Для исходных данных
-    dcc.Store(id='stored-data-filtered'),  # Для фильтрованных данных
-    dcc.Loading(id="loading", children=[
-        dcc.Dropdown(id='x-column'),
-        dcc.Dropdown(id='y-column'),
-    ]),
+            # Область загрузки данных
+            dbc.Row([
+                dbc.Col([
+                    dcc.Upload(
+                        id='upload-data',
+                        children=html.Div([
+                            'Перетащите или ',
+                            html.A('выберите файл')
+                        ]),
+                        style={
+                            'width': '100%',
+                            'height': '60px',
+                            'lineHeight': '60px',
+                            'borderWidth': '1px',
+                            'borderStyle': 'dashed',
+                            'borderRadius': '5px',
+                            'textAlign': 'center'
+                        },
+                        multiple=False
+                    ),
+                    html.Div(id='upload-status')
+                ], width=12)
+            ], className="mb-4"),
 
-    html.Div(id='page-content'),
+            # Вкладки для работы с данными
+            dbc.Tabs([
+                dbc.Tab(label="Просмотр данных", children=[
+                    dbc.Row([
+                        dbc.Col([
+                            html.Div(id='dataset-preview')
+                        ])
+                    ])
+                ]),
+                dbc.Tab(label="Редактирование данных", children=[
+                    dbc.Row([
+                        dbc.Col([
+                            dash_table.DataTable(
+                                id='editable-table',
+                                columns=[],
+                                data=[],
+                                editable=True,
+                                filter_action="native",
+                                sort_action="native",
+                                sort_mode="multi",
+                                column_selectable="single",
+                                row_selectable="multi",
+                                row_deletable=True,
+                                page_action="native",
+                                page_current=0,
+                                page_size=10,
+                            ),
+                            html.Div([
+                                dbc.Button("Сохранить изменения", id="save-changes-btn", color="primary"),
+                                dbc.Button("Отменить изменения", id="reset-changes-btn", color="secondary")
+                            ])
+                        ])
+                    ])
+                ]),
 
-])
+                dbc.Tab(label="Анализ данных", children=[
+                    dbc.Row([
+                        dbc.Col([
+                            dcc.Dropdown(
+                                id='analysis-type-dropdown',
+                                options=[
+                                    {'label': 'Общий анализ', 'value': 'overall'},
+                                    {'label': 'Статистические тесты', 'value': 'statistical'},
+                                    {'label': 'Корреляционный анализ', 'value': 'correlation'}
+                                ],
+                                placeholder="Выберите тип анализа"
+                            ),
+                            html.Div(id='analysis-results')
+                        ])
+                    ])
+                ]),
 
-main_page_layout = html.Div([
-    html.H3("Загрузка набора данных"),
-    dcc.Upload(
-        id='upload-data',
-        children=html.Div(['Перетащите или выберите файл']),
-        style={
-            'width': '60%', 'height': '60px', 'lineHeight': '60px',
-            'borderWidth': '1px', 'borderStyle': 'dashed',
-            'borderRadius': '5px', 'textAlign': 'center', 'margin': '10px'
-        },
-        multiple=False
-    ),
-    html.Button("Перейти к просмотру", id='go-to-data', n_clicks=0, disabled=True)
-])
+                dbc.Tab(label="Визуализация", children=[
+                    dbc.Row([
+                        dbc.Col([
+                            dcc.Dropdown(
+                                id='visualization-type-dropdown',
+                                options=[
+                                    {'label': 'Гистограмма', 'value': 'histogram'},
+                                    {'label': 'Scatter', 'value': 'scatter'},
+                                    {'label': 'Линейный', 'value': 'line'},
+                                    {'label': '3D Scatter', 'value': 'scatter3d'}
+                                ],
+                                placeholder="Выберите тип графика"
+                            ),
+                            dcc.Dropdown(
+                                id='x-axis-column',
+                                placeholder="Выберите колонку для X"
+                            ),
+                            dcc.Dropdown(
+                                id='y-axis-column',
+                                placeholder="Выберите колонку для Y"
+                            ),
+                            dcc.Dropdown(
+                                id='z-axis-column',
+                                placeholder="Выберите колонку для Z",
+                                style={'display': 'none'}
+                            ),
+                            dcc.Graph(id='visualization-output')
+                        ])
+                    ])
+                ])
+            ])
+        ], fluid=True)
 
-data_page_layout = html.Div([
-    html.H3("Просмотр и подготовка данных"),
-    html.Div([
-        html.Div([
-            html.H4("Фильтры"),
-            html.Div("Столбец:"),
-            dcc.Dropdown(id='filter-column', placeholder='Выберите столбец'),
-            html.Div("Оператор:"),
-            dcc.Dropdown(
-                id='filter-operator',
-                options=[
-                    {'label': '>', 'value': '>'},
-                    {'label': '<', 'value': '<'},
-                    {'label': '==', 'value': '=='},
-                    {'label': '!=', 'value': '!='},
-                    {'label': '>=', 'value': '>='},
-                    {'label': '<=', 'value': '<='}
-                ],
-                placeholder='Выберите оператор'
-            ),
-            html.Div("Значение:"),
-            dcc.Input(id='filter-value', placeholder='Введите значение', style={'width': '100%'}),
-            html.Button("Применить фильтр", id='apply-filter', n_clicks=0),
-            html.Br(), html.Br(),
+    def parse_contents(self, contents, filename):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
 
-            html.Br(), html.Br(),
-
-            html.H4("Очистка данных"),
-            html.Div("Удаление дубликатов:"),
-            dcc.Dropdown(id='duplicate-column', placeholder='Столбец (необязательно)'),
-            dcc.Dropdown(
-                id='duplicate-keep',
-                options=[
-                    {'label': 'Первый', 'value': 'first'},
-                    {'label': 'Последний', 'value': 'last'},
-                    {'label': 'Все', 'value': False}
-                ],
-                placeholder='Способ сохранения дубликатов'
-            ),
-            html.Button("Удалить дубликаты", id='clean-duplicates', n_clicks=0),
-            html.Br(), html.Br(),
-
-            html.H4("Нормализация данных"),
-            dcc.Checklist(id='normalize-columns', inline=True),
-            html.Button("Min-Max нормализация", id='minmax-normalize', n_clicks=0),
-            html.Button("Z-score нормализация", id='zscore-normalize', n_clicks=0),
-            html.Br(), html.Br(),
-
-            html.Button("Перейти к визуализации", id='go-to-viz', n_clicks=0)
-        ], style={'width': '20%', 'display': 'inline-block', 'verticalAlign': 'top', 'marginRight': '20px'}),
-
-        html.Div([
-            html.H4("Предпросмотр данных"),
-            dash_table.DataTable(
-                id='data-table',
-                page_size=10,
-                style_table={'overflowX': 'auto'},
-                style_cell={'textAlign': 'left'}
-            )
-        ], style={'width': '75%', 'display': 'inline-block', 'verticalAlign': 'top'})
-    ])
-])
-
-viz_page_layout = html.Div([
-    html.H3("Визуализация данных"),
-    html.Div([
-        html.Div("Тип визуализации:"),
-        dcc.Dropdown(
-            id='viz-type',
-            options=[
-                {'label': 'Линейный график', 'value': 'line'},
-                {'label': 'Столбчатая диаграмма', 'value': 'bar'},
-                {'label': 'Точечная диаграмма', 'value': 'scatter'}
-            ],
-            value='line'
-        ),
-        html.Div("Столбец X:"),
-        dcc.Dropdown(id='x-column'),
-        html.Div("Столбец Y:"),
-        dcc.Dropdown(id='y-column'),
-        html.Button("Построить график", id='build-plot', n_clicks=0)
-    ], style={'width': '20%', 'display': 'inline-block', 'verticalAlign': 'top', 'marginRight': '20px'}),
-    html.Div([
-        dcc.Graph(id='main-graph')
-    ], style={'width': '75%', 'display': 'inline-block', 'verticalAlign': 'top'})
-])
-
-
-@app.callback(
-    Output('page-content', 'children'),
-    Input('url', 'pathname')
-)
-def display_page(pathname):
-    if pathname == '/view-data':
-        return data_page_layout
-    elif pathname == '/viz':
-        return viz_page_layout
-    else:
-        return main_page_layout
-
-
-@app.callback(
-    Output('go-to-data', 'disabled'),
-    Input('upload-data', 'contents'),
-    State('upload-data', 'filename')
-)
-def enable_go_to_data(contents, filename):
-    if contents is not None and filename:
-        return False
-    return True
-
-
-def parse_contents(contents, filename):
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-    if 'csv' in filename.lower():
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-    elif 'xls' in filename.lower() or 'xlsx' in filename.lower():
-        return pd.read_excel(io.BytesIO(decoded))
-    else:
-        return pd.DataFrame()
-
-
-@app.callback(
-    Output('stored-data-original', 'data'),
-    Output('stored-data-filtered', 'data', allow_duplicate=True),
-    Output('url', 'pathname', allow_duplicate=True),
-    Input('go-to-data', 'n_clicks'),
-    State('upload-data', 'contents'),
-    State('upload-data', 'filename')
-)
-def load_data(n_clicks, contents, filename):
-    if n_clicks > 0 and contents is not None and filename is not None:
-        df = parse_contents(contents, filename)
-        if not df.empty:
-            return df.to_json(date_format='iso', orient='split'), df.to_json(date_format='iso',
-                                                                             orient='split'), '/view-data'
-    raise PreventUpdate
-
-
-@app.callback(
-    Output('data-table', 'columns'),
-    Output('filter-column', 'options'),
-    Output('duplicate-column', 'options'),
-    Output('normalize-columns', 'options'),
-    Input('stored-data-filtered', 'data')
-)
-def update_table(filtered_data_json):
-    if filtered_data_json:
-        df_filtered = pd.read_json(io.StringIO(filtered_data_json), orient='split')
-
-        # Конвертация типов
-        for c in df_filtered.columns:
-            if df_filtered[c].dtype == object:
-                try:
-                    df_filtered[c] = pd.to_datetime(df_filtered[c], infer_datetime_format=True, errors='coerce')
-                except Exception as e:
-                    print(f"Error converting column {c} to datetime: {e}")
-
-        columns_info = [{'name': f"{col} ({df_filtered[col].dtype})", 'id': col} for col in df_filtered.columns]
-        filter_options = [{'label': c, 'value': c} for c in df_filtered.columns]
-        duplicate_options = [{'label': c, 'value': c} for c in df_filtered.columns]
-        normalize_options = [{'label': c, 'value': c} for c in df_filtered.columns if
-                             pd.api.types.is_numeric_dtype(df_filtered[c])]
-
-        return columns_info, filter_options, duplicate_options, normalize_options
-    return [], [], [], [], []
-
-
-@app.callback(
-    Output('stored-data-filtered', 'data', allow_duplicate=True),
-    Output('data-table', 'data'),
-    Input('apply-filter', 'n_clicks'),
-    Input('clean-duplicates', 'n_clicks'),
-    Input('minmax-normalize', 'n_clicks'),
-    Input('zscore-normalize', 'n_clicks'),
-    State('stored-data-original', 'data'),
-    State('stored-data-filtered', 'data'),
-    State('filter-column', 'value'),
-    State('filter-operator', 'value'),
-    State('filter-value', 'value'),
-    State('duplicate-column', 'value'),
-    State('duplicate-keep', 'value'),
-    State('normalize-columns', 'value')
-)
-def update_data_table(
-        filter_clicks, dup_clicks, minmax_clicks, zscore_clicks,
-        original_data_json, filtered_data_json,
-        filter_column, filter_op, filter_val,
-        dup_col, dup_keep,
-        norm_columns
-):
-    ctx = dash.callback_context
-
-    if not ctx.triggered:
-        raise PreventUpdate
-
-    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    if original_data_json is None:
-        raise PreventUpdate
-
-    df_original = pd.read_json(io.StringIO(original_data_json), orient='split')
-    df_filtered = pd.read_json(io.StringIO(filtered_data_json),
-                               orient='split') if filtered_data_json else df_original.copy()
-
-    cleaner = Cleaner()
-    normalizer = Normalizer()
-
-    if triggered_id == 'apply-filter':
-        if filter_column and filter_op and filter_val is not None:
-            try:
-                # Попытка преобразовать значение к числу
-                val_parsed = float(filter_val)
-            except ValueError:
-                val_parsed = filter_val
-
-            try:
-                if filter_op == '==':
-                    df_filtered = df_filtered[df_filtered[filter_column] == val_parsed]
-                elif filter_op == '!=':
-                    df_filtered = df_filtered[df_filtered[filter_column] != val_parsed]
-                elif filter_op == '>':
-                    df_filtered = df_filtered[df_filtered[filter_column] > val_parsed]
-                elif filter_op == '<':
-                    df_filtered = df_filtered[df_filtered[filter_column] < val_parsed]
-                elif filter_op == '>=':
-                    df_filtered = df_filtered[df_filtered[filter_column] >= val_parsed]
-                elif filter_op == '<=':
-                    df_filtered = df_filtered[df_filtered[filter_column] <= val_parsed]
-            except:
-                # В случае ошибки возвращаем исходные данные
-                df_filtered = df_original.copy()
-
-    elif triggered_id == 'clean-duplicates':
-        if not df_filtered.empty:
-            cleaner.load_data(df_filtered)
-            cleaner.clean_duplicates(dup_col, keep=dup_keep)
-            df_filtered = cleaner.data.copy()
-
-    elif triggered_id == 'minmax-normalize':
-        if norm_columns and not df_filtered.empty:
-            normalizer.load_data(df_filtered)
-            normalizer.min_max_normalize(norm_columns)
-            df_filtered = normalizer.data.copy()
-
-    elif triggered_id == 'zscore-normalize':
-        if norm_columns and not df_filtered.empty:
-            normalizer.load_data(df_filtered)
-            normalizer.z_score_normalize(norm_columns)
-            df_filtered = normalizer.data.copy()
-
-    # Обновляем stored-data-filtered
-    filtered_data_updated = df_filtered.to_json(date_format='iso', orient='split')
-
-    # Возвращаем обновленные данные для Store и таблицы
-    return filtered_data_updated, df_filtered.head(50).to_dict('records')
-
-
-@app.callback(
-    Output('url', 'pathname'),
-    Input('go-to-viz', 'n_clicks')
-)
-def go_to_viz_page(n):
-    if n > 0:
-        return '/viz'
-    return dash.no_update
-
-
-@app.callback(
-    Output('x-column', 'options'),
-    Output('y-column', 'options'),
-    Input('url', 'pathname'),
-    State('stored-data-filtered', 'data'),
-)
-def update_viz_options(pathname, filtered_data_json):
-    if pathname != '/viz':
-        raise PreventUpdate
-    if filtered_data_json:
         try:
-            df_filtered = pd.read_json(io.StringIO(filtered_data_json), orient='split')
-            print("update_viz_options called. Columns:", df_filtered.columns.tolist())  # Отладочный вывод
-            options = [{'label': c, 'value': c} for c in df_filtered.columns]
-            return options, options
+            if 'csv' in filename:
+                df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            elif 'xls' in filename:
+                df = pd.read_excel(io.BytesIO(decoded))
+            else:
+                return None
+
+            return df
         except Exception as e:
-            print(f"Error in update_viz_options: {e}")  # Отладочный вывод
+            print(f"Ошибка загрузки файла: {e}")
+            return None
+
+    def register_callbacks(self):
+        @self.app.callback(
+            [Output('editable-table', 'columns'),
+             Output('editable-table', 'data')],
+            [Input('upload-data', 'contents')],
+            [State('upload-data', 'filename')]
+        )
+        def update_editable_table(contents, filename):
+            if contents is not None:
+                df = self.parse_contents(contents, filename)
+
+                columns = [
+                    {'name': i, 'id': i, 'deletable': True,
+                     'renamable': True} for i in df.columns
+                ]
+
+                return columns, df.to_dict('records')
+
             return [], []
-    print("update_viz_options called but no data available.")  # Отладочный вывод
-    return [], []
+
+        @self.app.callback(
+            [Output('upload-status', 'children'),
+             Output('dataset-preview', 'children'),
+             Output('x-axis-column', 'options'),
+             Output('y-axis-column', 'options'),
+             Output('z-axis-column', 'options',allow_duplicate=True)],
+            [Input('upload-data', 'contents'),
+             Input('save-changes-btn', 'n_clicks')],
+            [State('upload-data', 'filename'),
+             State('editable-table', 'data')]
+        )
+        def update_data(contents, n_clicks, filename, edited_data):
+            ctx = callback_context
+            triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+            # Handle file upload
+            if triggered_id == 'upload-data' and contents is not None:
+                df = self.parse_contents(contents, filename)
+
+                if df is not None:
+                    self.current_dataframe = df
+
+                    # Превью данных
+                    preview_table = dbc.Table.from_dataframe(
+                        df.head(10),
+                        striped=True,
+                        bordered=True,
+                        hover=True
+                    )
+
+                    # Опции для колонок визуализации
+                    column_options = [{'label': col, 'value': col} for col in df.columns]
+
+                    return (
+                        f"Файл {filename} успешно загружен",
+                        preview_table,
+                        column_options,
+                        column_options,
+                        column_options
+                    )
+
+            # Handle save changes
+            elif triggered_id == 'save-changes-btn' and n_clicks and edited_data:
+                df_edited = pd.DataFrame(edited_data)
+                self.current_dataframe = df_edited
+
+                # Опции для колонок визуализации
+                column_options = [{'label': col, 'value': col} for col in df_edited.columns]
+
+                return (
+                    "Данные успешно обновлены",
+                    dbc.Table.from_dataframe(
+                        df_edited.head(10),
+                        striped=True,
+                        bordered=True,
+                        hover=True
+                    ),
+                    column_options,
+                    column_options,
+                    column_options
+                )
+
+            # Default return if no action is taken
+            return "Загрузите файл", None, [], [], []
+
+        @self.app.callback(
+            Output('analysis-results', 'children'),
+            [Input('analysis-type-dropdown', 'value')]
+        )
+        def perform_analysis(analysis_type):
+            if self.current_dataframe is None:
+                return "Сначала загрузите данные"
+
+            viewer = DataViewer(self.current_dataframe)
+
+            if analysis_type == 'overall':
+                analysis = viewer.analyze_overall()
+                return html.Pre(str(analysis))
+
+            elif analysis_type == 'statistical':
+                tests = viewer.statistical_tests()
+                return html.Pre(str(tests))
+
+            elif analysis_type == 'correlation':
+                correlations = viewer.correlation_analysis()
+                return html.Pre(str(correlations))
+
+        @self.app.callback(
+            [Output('z-axis-column', 'options',allow_duplicate=True),
+             Output('z-axis-column', 'style',allow_duplicate=True)],
+            [Input('visualization-type-dropdown', 'value')]
+        )
+        def toggle_z_axis(vis_type):
+            if vis_type in ['scatter3d', 'surface', 'contour', 'heatmap']:
+                return (
+                    [{'label': col, 'value': col} for col in self.current_dataframe.columns],
+                    {'display': 'block'}
+                )
+            return [], {'display': 'none'}
+
+        @self.app.callback(
+            Output('visualization-output', 'figure'),
+            [Input('visualization-type-dropdown', 'value'),
+             Input('x-axis-column', 'value'),
+             Input('y-axis-column', 'value'),
+             Input('z-axis-column', 'value')]
+        )
+        def update_visualization(vis_type, x_column, y_column, z_column):
+            if self.current_dataframe is None or x_column is None:
+                return {}
+
+            visualizer = Visualizer(vis_type)
+
+            # Добавляем поддержку всех типов визуализации из Visualizer
+            visualization_mapping = {
+                'histogram': lambda: (
+                    visualizer.load_data(x=self.current_dataframe[x_column]).plot()
+                    if x_column else {}
+                ),
+                'kde': lambda: (
+                    visualizer.load_data(x=self.current_dataframe[x_column]).plot()
+                    if x_column else {}
+                ),
+                'distribution': lambda: (
+                    visualizer.load_data(x=self.current_dataframe[x_column]).plot()
+                    if x_column else {}
+                ),
+                'scatter': lambda: (
+                    visualizer.load_data(
+                        x=self.current_dataframe[x_column],
+                        y=self.current_dataframe[y_column]
+                    ).plot()
+                    if x_column and y_column else {}
+                ),
+                'line': lambda: (
+                    visualizer.load_data(
+                        x=self.current_dataframe[x_column],
+                        y=self.current_dataframe[y_column]
+                    ).plot()
+                    if x_column and y_column else {}
+                ),
+                'bar': lambda: (
+                    visualizer.load_data(
+                        x=self.current_dataframe[x_column],
+                        y=self.current_dataframe[y_column]
+                    ).plot()
+                    if x_column and y_column else {}
+                ),
+                'area': lambda: (
+                    visualizer.load_data(
+                        x=self.current_dataframe[x_column],
+                        y=self.current_dataframe[y_column]
+                    ).plot()
+                    if x_column and y_column else {}
+                ),
+                'box': lambda: (
+                    visualizer.load_data(
+                        x=self.current_dataframe[x_column],
+                        y=self.current_dataframe[y_column]
+                    ).plot()
+                    if x_column and y_column else {}
+                ),
+                'violin': lambda: (
+                    visualizer.load_data(
+                        x=self.current_dataframe[x_column],
+                        y=self.current_dataframe[y_column]
+                    ).plot()
+                    if x_column and y_column else {}
+                ),
+                'scatter3d': lambda: (
+                    visualizer.load_data(
+                        x=self.current_dataframe[x_column],
+                        y=self.current_dataframe[y_column],
+                        z=self.current_dataframe[z_column]
+                    ).plot()
+                    if x_column and y_column and z_column else {}
+                ),
+                'surface': lambda: (
+                    visualizer.load_data(z=self.current_dataframe[z_column]).plot()
+                    if z_column else {}
+                ),
+                'contour': lambda: (
+                    visualizer.load_data(z=self.current_dataframe[z_column]).plot()
+                    if z_column else {}
+                ),
+                'heatmap': lambda: (
+                    visualizer.load_data(z=self.current_dataframe[z_column]).plot()
+                    if z_column else {}
+                )
+            }
+
+            plot_func = visualization_mapping.get(vis_type)
+            return plot_func() if plot_func else {}
 
 
-@app.callback(
-    Output('main-graph', 'figure'),
-    Input('build-plot', 'n_clicks'),
-    State('viz-type', 'value'),
-    State('x-column', 'value'),
-    State('y-column', 'value'),
-    State('stored-data-filtered', 'data')
-)
-def build_graph(n_clicks, viz_type, x_col, y_col, filtered_data_json):
-    if n_clicks > 0 and x_col and y_col and filtered_data_json:
-        df_filtered = pd.read_json(io.StringIO(filtered_data_json), orient='split')
-        vis = Visualizer(visualization_type=viz_type)
-        vis.load_data(df_filtered[x_col], df_filtered[y_col])
-        fig = vis.get_figure(title="Результат визуализации")
-        return fig
-    return px.line()
+    def run(self, debug=True):
+        self.app.run_server(debug=debug)
 
 
+# Запуск приложения
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app = DataInsightApp()
+    app.run()

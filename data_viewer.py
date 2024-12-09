@@ -25,6 +25,7 @@ class DataViewer:
         series = self.df[col].dropna()
         if series.empty:
             return {}
+
         desc = series.describe(percentiles=[0.25, 0.5, 0.75]).to_dict()
 
         # Дополнительные метрики
@@ -55,6 +56,7 @@ class DataViewer:
     def analyze_categorical(self, col: str) -> Dict[str, Any]:
         """Метрики для категориального столбца."""
         series = self.df[col].dropna().astype(str)
+
         if series.empty:
             return {}
 
@@ -79,8 +81,10 @@ class DataViewer:
             # Попытка преобразовать к datetime, если возможно
             try:
                 dt_series = pd.to_datetime(self.df[col], errors='coerce').dropna()
+
             except Exception as err:
                 return {}
+
         else:
             dt_series = self.df[col].dropna()
 
@@ -180,6 +184,30 @@ class DataViewer:
                     }
 
         return result
+
+    def sort_dataframe(self, column: str, ascending: bool = True) -> pd.DataFrame:
+        """
+        Сортировка DataFrame по выбранному столбцу
+
+        Args:
+            column (str): Столбец для сортировки
+            ascending (bool): Направление сортировки
+
+        Returns:
+            pd.DataFrame: Отсортированный DataFrame
+        """
+        if column not in self.df.columns:
+            raise ValueError(f"Столбец {column} не найден")
+
+        sorted_df = self.df.sort_values(by=column, ascending=ascending)
+
+        return sorted_df
+
+    def apply_sorting(self, column: str, ascending: bool = True):
+        """
+        Применение сортировки к текущему DataFrame
+        """
+        self.df = self.sort_dataframe(column, ascending)
 
     def statistical_tests(self, columns: List[str] = None) -> Dict[str, Any]:
         """

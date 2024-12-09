@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List, Union, Optional
 
 import numpy as np
@@ -41,8 +43,10 @@ class DataValidator:
             q1 = np.percentile(data_array, 25)
             q3 = np.percentile(data_array, 75)
             iqr = q3 - q1
+
             lower_bound = q1 - 1.5 * iqr
             upper_bound = q3 + 1.5 * iqr
+
             outliers = data_array[(data_array < lower_bound) | (data_array > upper_bound)]
             outlier_percentage = len(outliers) / len(data_array) * 100 if len(data_array) > 0 else 0
 
@@ -94,6 +98,7 @@ class DataValidator:
                          y: Optional[Union[List, np.ndarray, pd.Series]] = None,
                          z: Union[List, np.ndarray, pd.Series] = None,
                          plot_type: str = 'scatter3d') -> dict:
+
         validation_result = {
             'is_valid': True,
             'errors': []
@@ -124,6 +129,7 @@ class DataValidator:
 
         elif plot_type in ['surface', 'contour', 'heatmap']:
             z_array = np.array(z)
+
             if z_array.ndim != 2:
                 validation_result['is_valid'] = False
                 validation_result['errors'].append("Для surface/contour/heatmap требуется 2D массив")
@@ -160,13 +166,13 @@ class Visualizer:
             'theme': 'plotly_white'
         }
 
-    def load_data(self, x=None, y=None, z=None):
+    def load_data(self, x=None, y=None, z=None) -> Visualizer:
         self.x = x
         self.y = y
         self.z = z
         return self
 
-    def set_params(self, **kwargs):
+    def set_params(self, **kwargs) -> Visualizer:
         """
         Установка дополнительных параметров для построения графика.
         Можно передать любые параметры, поддерживаемые plotly.express или go.
@@ -198,7 +204,7 @@ class Visualizer:
             }
             return False
 
-    def plot(self, title: str = 'Visualization'):
+    def _plot(self, title: str = 'Visualization'):
         if not self.validate():
             error_message = "\n".join(self.validation_result['errors'])
             raise ValueError(f"Ошибка валидации данных:\n{error_message}")
@@ -210,7 +216,7 @@ class Visualizer:
         elif self.visualization_type in ['scatter3d', 'surface', 'contour', 'heatmap']:
             return self._three_dimensional_plot(title)
 
-    def _one_dimensional_plot(self, title):
+    def _one_dimensional_plot(self, title: str) -> go.Figure:
         if self.visualization_type == 'histogram':
             fig = px.histogram(x=self.x, title=title, **self.plot_params)
         elif self.visualization_type == 'kde':
@@ -219,9 +225,10 @@ class Visualizer:
             fig = px.ecdf(x=self.x, title=title, **self.plot_params)
         else:
             raise ValueError("Некорректный тип графика")
+
         return fig
 
-    def _two_dimensional_plot(self, title):
+    def _two_dimensional_plot(self, title: str) -> go.Figure:
         if self.visualization_type == 'scatter':
             fig = px.scatter(x=self.x, y=self.y, title=title, **self.plot_params)
         elif self.visualization_type == 'line':
@@ -236,9 +243,10 @@ class Visualizer:
             fig = px.violin(x=self.x, y=self.y, title=title, **self.plot_params)
         else:
             raise ValueError("Некорректный тип графика")
+
         return fig
 
-    def _three_dimensional_plot(self, title):
+    def _three_dimensional_plot(self, title: str) -> go.Figure:
         if self.visualization_type == 'scatter3d':
             if isinstance(self.x, np.ndarray) and self.x.ndim > 1:
                 x = self.x.ravel()
@@ -246,35 +254,41 @@ class Visualizer:
                 z = self.z.ravel()
             else:
                 x, y, z = self.x, self.y, self.z
+
             fig = px.scatter_3d(x=x, y=y, z=z, title=title, **self.plot_params)
+
         elif self.visualization_type == 'surface':
             # Для surface необходимо использовать go.Surface
             # Параметры, не поддерживаемые напрямую go.Surface, можно задавать через layout
             fig = go.Figure(
                 data=[go.Surface(z=self.z, **{k: v for k, v in self.plot_params.items() if k not in ['title']})])
             fig.update_layout(title=title, **{k: v for k, v in self.plot_params.items() if k not in ['z']})
+
         elif self.visualization_type == 'contour':
             fig = go.Figure(
                 data=go.Contour(z=self.z, **{k: v for k, v in self.plot_params.items() if k not in ['title']}))
             fig.update_layout(title=title, **{k: v for k, v in self.plot_params.items() if k not in ['z']})
+
         elif self.visualization_type == 'heatmap':
             fig = px.imshow(self.z, title=title, **self.plot_params)
+
         else:
             raise ValueError("Некорректный тип графика")
+
         return fig
 
-    def get_figure(self, title: str = 'Visualization'):
+    def get_figure(self, title: str = 'Visualization') -> go.Figure:
         return self.plot(title=title)
 
-    def show(self):
+    def show(self) -> None:
         fig = self.plot()
         fig.show()
 
-    def save(self, filename='visualization.html'):
+    def save(self, filename:str='visualization.html') -> None:
         fig = self.plot()
         fig.write_html(filename)
 
-    def set_interactive_settings(self, **kwargs):
+    def set_interactive_settings(self, **kwargs) -> Visualizer:
         """
         Установка интерактивных настроек визуализации
 
@@ -296,7 +310,7 @@ class Visualizer:
 
         return self
 
-    def apply_interactive_settings(self, fig):
+    def apply_interactive_settings(self, fig: go.Figure) -> go.Figure:
         """
         Применение интерактивных настроек к графику
         """
@@ -320,10 +334,10 @@ class Visualizer:
             'inferno': 'Inferno'
         }
         if self.interactive_settings['color_scale'] in color_scales:
-            fig.update_traces(colorscale=color_scales[self.interactive_settings['color_scale']])
+            fig.update_traces(marker=dict(colorscale=color_scales[self.interactive_settings['color_scale']]))
 
         return fig
 
-    def plot(self, title: str = 'Visualization'):
-        fig = super().plot(title)
+    def plot(self, title: str = 'Visualization') -> go.Figure:
+        fig = self._plot(title)
         return self.apply_interactive_settings(fig)
