@@ -1,18 +1,14 @@
-import dash
-from dash import dcc, html, Input, Output, State, dash_table
-import plotly.express as px
-import pandas as pd
 import base64
 import io
-import numpy as np
-import datetime
+
+import dash
+import pandas as pd
+import plotly.express as px
+from dash import dcc, html, Input, Output, State, dash_table
 from dash.exceptions import PreventUpdate
+
 from tools import Cleaner, Normalizer
 from visualizer import Visualizer
-
-# Предполагается, что вы импортируете ваши классы отдельно:
-# from visualizer import Visualizer
-# from tools import Cleaner, Normalizer
 
 app = dash.Dash(__name__, suppress_callback_exceptions=True, prevent_initial_callbacks=True)
 

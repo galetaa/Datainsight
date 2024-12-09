@@ -40,7 +40,7 @@ class Cleaner(BaseTool):
             mask = whitespace_mask | nan_mask
             return mask
 
-    def clean_missing_values(self, column: str | None = None, only_nan: bool = False):
+    def clean_missing_values(self, column: str | None = None, only_nan: bool = False) -> DataFrame:
         df: DataFrame = self.data
         if not (column is None):
             if column not in df.columns:
@@ -108,7 +108,7 @@ class Cleaner(BaseTool):
             duplicate_mask = df.duplicated(keep=keep)
         return df.loc[duplicate_mask]
 
-    def clean_duplicates(self, column: str | None = None, keep: Literal['first', 'last', False] = 'first'):
+    def clean_duplicates(self, column: str | None = None, keep: Literal['first', 'last', False] = 'first') -> DataFrame:
         df = self.data
         if column:
             if column not in df.columns:
@@ -209,7 +209,7 @@ class AnomaliesDetector(BaseTool):
 
 
 class Normalizer(BaseTool):
-    def min_max_normalize(self, columns=None, feature_range=(0, 1)):
+    def min_max_normalize(self, columns=None, feature_range=(0, 1)) -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -221,7 +221,7 @@ class Normalizer(BaseTool):
 
         return df
 
-    def z_score_normalize(self, columns=None):
+    def z_score_normalize(self, columns=None) -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -230,7 +230,7 @@ class Normalizer(BaseTool):
         df[columns] = (df[columns] - df[columns].mean()) / df[columns].std()
         return df
 
-    def max_abs_normalize(self, columns=None):
+    def max_abs_normalize(self, columns=None) -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -239,7 +239,7 @@ class Normalizer(BaseTool):
         df[columns] = df[columns] / df[columns].abs().max()
         return df
 
-    def robust_normalize(self, columns=None):
+    def robust_normalize(self, columns=None) -> DataFrame:
         df = self.data
         if columns is None:
             columns = df.select_dtypes(include=[np.number]).columns
@@ -252,7 +252,7 @@ class Normalizer(BaseTool):
 
         return df
 
-    def log_transform(self, columns=None):
+    def log_transform(self, columns=None) -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -262,7 +262,7 @@ class Normalizer(BaseTool):
         df[columns] = np.log1p(df[columns])  # log(1 + X), чтобы избежать логарифма от 0
         return df
 
-    def normalize_data(self, method='zscore', columns=None, **kwargs):
+    def normalize_data(self, method='zscore', columns=None, **kwargs) -> DataFrame:
         if method == 'min_max':
             return self.min_max_normalize(columns, **kwargs)
         elif method == 'zscore':
@@ -278,7 +278,7 @@ class Normalizer(BaseTool):
 
 
 class Converter(BaseTool):
-    def convert_to_numeric(self, columns=None, errors='ignore'):
+    def convert_to_numeric(self, columns=None, errors='ignore') -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -297,7 +297,7 @@ class Converter(BaseTool):
 
         return df
 
-    def convert_to_datetime(self, columns=None, formate=None):
+    def convert_to_datetime(self, columns=None, formate=None) -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -307,7 +307,7 @@ class Converter(BaseTool):
             df[col] = pd.to_datetime(df[col], format=formate, errors='coerce')  # Преобразуем в datetime
         return df
 
-    def one_hot_encode(self, columns=None):
+    def one_hot_encode(self, columns=None) -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -316,7 +316,7 @@ class Converter(BaseTool):
         df = pd.get_dummies(df, columns=columns, drop_first=True)  # One-hot кодировка
         return df
 
-    def label_encode(self, columns=None):
+    def label_encode(self, columns=None) -> DataFrame:
         df = self.data
 
         if columns is None:
@@ -327,7 +327,7 @@ class Converter(BaseTool):
             df[col] = label_encoder.fit_transform(df[col])  # Преобразуем в метки
         return df
 
-    def optimize_data_types(self):
+    def optimize_data_types(self) -> DataFrame:
         df = self.data
 
         for col in df.columns:

@@ -152,6 +152,14 @@ class Visualizer:
         self.validation_result: Optional[dict] = None
         self.plot_params = {}  # Хранение дополнительных параметров для построения графика
 
+        self.interactive_settings = {
+            'zoom': True,
+            'hover_info': True,
+            'selection_mode': 'multiple',
+            'color_scale': 'default',
+            'theme': 'plotly_white'
+        }
+
     def load_data(self, x=None, y=None, z=None):
         self.x = x
         self.y = y
@@ -265,3 +273,57 @@ class Visualizer:
     def save(self, filename='visualization.html'):
         fig = self.plot()
         fig.write_html(filename)
+
+    def set_interactive_settings(self, **kwargs):
+        """
+        Установка интерактивных настроек визуализации
+
+        Args:
+            kwargs: Параметры интерактивности
+                - zoom (bool): Включить зум
+                - hover_info (bool): Показывать информацию при наведении
+                - selection_mode (str): Режим выделения ('single', 'multiple')
+                - color_scale (str): Цветовая шкала
+                - theme (str): Тема оформления
+        """
+        allowed_settings = ['zoom', 'hover_info', 'selection_mode', 'color_scale', 'theme']
+
+        for key, value in kwargs.items():
+            if key in allowed_settings:
+                self.interactive_settings[key] = value
+            else:
+                print(f"Предупреждение: Настройка {key} не поддерживается")
+
+        return self
+
+    def apply_interactive_settings(self, fig):
+        """
+        Применение интерактивных настроек к графику
+        """
+        if not self.interactive_settings['zoom']:
+            fig.update_layout(dragmode=False)
+
+        if self.interactive_settings['hover_info']:
+            fig.update_traces(hovertemplate='%{x}, %{y}<extra></extra>')
+
+        # Настройка темы
+        fig.update_layout(
+            template=self.interactive_settings['theme'],
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+
+        # Цветовая схема
+        color_scales = {
+            'default': None,
+            'viridis': 'Viridis',
+            'plasma': 'Plasma',
+            'inferno': 'Inferno'
+        }
+        if self.interactive_settings['color_scale'] in color_scales:
+            fig.update_traces(colorscale=color_scales[self.interactive_settings['color_scale']])
+
+        return fig
+
+    def plot(self, title: str = 'Visualization'):
+        fig = super().plot(title)
+        return self.apply_interactive_settings(fig)
