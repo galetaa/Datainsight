@@ -25,6 +25,10 @@ app.layout = html.Div([
     # Добавляем Store для хранения данных
     dcc.Store(id='stored-data-original'),  # Для исходных данных
     dcc.Store(id='stored-data-filtered'),  # Для фильтрованных данных
+    dcc.Loading(id="loading", children=[
+        dcc.Dropdown(id='x-column'),
+        dcc.Dropdown(id='y-column'),
+    ]),
 
     html.Div(id='page-content'),
 
@@ -70,31 +74,6 @@ data_page_layout = html.Div([
             html.Button("Применить фильтр", id='apply-filter', n_clicks=0),
             html.Br(), html.Br(),
 
-            html.H4("Агрегация по времени"),
-            html.Div("Столбец даты:"),
-            dcc.Dropdown(id='date-column'),
-            html.Div("Период:"),
-            dcc.Dropdown(
-                id='aggregation-period',
-                options=[
-                    {'label': 'День', 'value': 'D'},
-                    {'label': 'Неделя', 'value': 'W'},
-                    {'label': 'Месяц', 'value': 'M'}
-                ],
-                value='D'
-            ),
-            html.Div("Тип агрегирования:"),
-            dcc.Dropdown(
-                id='aggregation-func',
-                options=[
-                    {'label': 'Сумма', 'value': 'sum'},
-                    {'label': 'Среднее', 'value': 'mean'},
-                    {'label': 'Максимум', 'value': 'max'},
-                    {'label': 'Минимум', 'value': 'min'}
-                ],
-                value='sum'
-            ),
-            html.Button("Применить агрегацию", id='apply-agg', n_clicks=0),
             html.Br(), html.Br(),
 
             html.H4("Очистка данных"),
@@ -213,32 +192,29 @@ def load_data(n_clicks, contents, filename):
 @app.callback(
     Output('data-table', 'columns'),
     Output('filter-column', 'options'),
-    Output('date-column', 'options'),
     Output('duplicate-column', 'options'),
     Output('normalize-columns', 'options'),
     Input('stored-data-filtered', 'data')
 )
 def update_table(filtered_data_json):
     if filtered_data_json:
-        df_filtered = pd.read_json(filtered_data_json, orient='split')
+        df_filtered = pd.read_json(io.StringIO(filtered_data_json), orient='split')
 
         # Конвертация типов
         for c in df_filtered.columns:
             if df_filtered[c].dtype == object:
                 try:
-                    df_filtered[c] = pd.to_datetime(df_filtered[c])
-                except:
-                    pass
+                    df_filtered[c] = pd.to_datetime(df_filtered[c], infer_datetime_format=True, errors='coerce')
+                except Exception as e:
+                    print(f"Error converting column {c} to datetime: {e}")
 
         columns_info = [{'name': f"{col} ({df_filtered[col].dtype})", 'id': col} for col in df_filtered.columns]
         filter_options = [{'label': c, 'value': c} for c in df_filtered.columns]
-        date_options = [{'label': c, 'value': c} for c in df_filtered.columns if
-                        pd.api.types.is_datetime64_any_dtype(df_filtered[c])]
         duplicate_options = [{'label': c, 'value': c} for c in df_filtered.columns]
         normalize_options = [{'label': c, 'value': c} for c in df_filtered.columns if
                              pd.api.types.is_numeric_dtype(df_filtered[c])]
 
-        return columns_info, filter_options, date_options, duplicate_options, normalize_options
+        return columns_info, filter_options, duplicate_options, normalize_options
     return [], [], [], [], []
 
 
@@ -246,7 +222,6 @@ def update_table(filtered_data_json):
     Output('stored-data-filtered', 'data', allow_duplicate=True),
     Output('data-table', 'data'),
     Input('apply-filter', 'n_clicks'),
-    Input('apply-agg', 'n_clicks'),
     Input('clean-duplicates', 'n_clicks'),
     Input('minmax-normalize', 'n_clicks'),
     Input('zscore-normalize', 'n_clicks'),
@@ -255,18 +230,14 @@ def update_table(filtered_data_json):
     State('filter-column', 'value'),
     State('filter-operator', 'value'),
     State('filter-value', 'value'),
-    State('date-column', 'value'),
-    State('aggregation-period', 'value'),
-    State('aggregation-func', 'value'),
     State('duplicate-column', 'value'),
     State('duplicate-keep', 'value'),
     State('normalize-columns', 'value')
 )
 def update_data_table(
-        filter_clicks, agg_clicks, dup_clicks, minmax_clicks, zscore_clicks,
+        filter_clicks, dup_clicks, minmax_clicks, zscore_clicks,
         original_data_json, filtered_data_json,
         filter_column, filter_op, filter_val,
-        date_col, period, agg_func,
         dup_col, dup_keep,
         norm_columns
 ):
@@ -280,8 +251,9 @@ def update_data_table(
     if original_data_json is None:
         raise PreventUpdate
 
-    df_original = pd.read_json(original_data_json, orient='split')
-    df_filtered = pd.read_json(filtered_data_json, orient='split') if filtered_data_json else df_original.copy()
+    df_original = pd.read_json(io.StringIO(original_data_json), orient='split')
+    df_filtered = pd.read_json(io.StringIO(filtered_data_json),
+                               orient='split') if filtered_data_json else df_original.copy()
 
     cleaner = Cleaner()
     normalizer = Normalizer()
@@ -311,14 +283,6 @@ def update_data_table(
                 # В случае ошибки возвращаем исходные данные
                 df_filtered = df_original.copy()
 
-    elif triggered_id == 'apply-agg':
-        if not df_filtered.empty and date_col:
-            if date_col in df_filtered.columns and pd.api.types.is_datetime64_any_dtype(df_filtered[date_col]):
-                df_filtered = df_filtered.set_index(date_col)
-                if agg_func in ['sum', 'mean', 'max', 'min']:
-                    df_filtered = df_filtered.resample(period).agg(agg_func)
-                df_filtered = df_filtered.reset_index()
-
     elif triggered_id == 'clean-duplicates':
         if not df_filtered.empty:
             cleaner.load_data(df_filtered)
@@ -345,7 +309,7 @@ def update_data_table(
 
 
 @app.callback(
-    Output('url', 'pathname', allow_duplicate=True),
+    Output('url', 'pathname'),
     Input('go-to-viz', 'n_clicks')
 )
 def go_to_viz_page(n):
@@ -357,13 +321,22 @@ def go_to_viz_page(n):
 @app.callback(
     Output('x-column', 'options'),
     Output('y-column', 'options'),
-    Input('stored-data-filtered', 'data')
+    Input('url', 'pathname'),
+    State('stored-data-filtered', 'data'),
 )
-def update_viz_options(filtered_data_json):
+def update_viz_options(pathname, filtered_data_json):
+    if pathname != '/viz':
+        raise PreventUpdate
     if filtered_data_json:
-        df_filtered = pd.read_json(filtered_data_json, orient='split')
-        options = [{'label': c, 'value': c} for c in df_filtered.columns]
-        return options, options
+        try:
+            df_filtered = pd.read_json(io.StringIO(filtered_data_json), orient='split')
+            print("update_viz_options called. Columns:", df_filtered.columns.tolist())  # Отладочный вывод
+            options = [{'label': c, 'value': c} for c in df_filtered.columns]
+            return options, options
+        except Exception as e:
+            print(f"Error in update_viz_options: {e}")  # Отладочный вывод
+            return [], []
+    print("update_viz_options called but no data available.")  # Отладочный вывод
     return [], []
 
 
@@ -377,7 +350,7 @@ def update_viz_options(filtered_data_json):
 )
 def build_graph(n_clicks, viz_type, x_col, y_col, filtered_data_json):
     if n_clicks > 0 and x_col and y_col and filtered_data_json:
-        df_filtered = pd.read_json(filtered_data_json, orient='split')
+        df_filtered = pd.read_json(io.StringIO(filtered_data_json), orient='split')
         vis = Visualizer(visualization_type=viz_type)
         vis.load_data(df_filtered[x_col], df_filtered[y_col])
         fig = vis.get_figure(title="Результат визуализации")
