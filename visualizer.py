@@ -284,7 +284,7 @@ class Visualizer:
         fig = self.plot()
         fig.show()
 
-    def save(self, filename:str='visualization.html') -> None:
+    def save(self, filename: str = 'visualization.html') -> None:
         fig = self.plot()
         fig.write_html(filename)
 

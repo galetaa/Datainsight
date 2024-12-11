@@ -2,13 +2,11 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import html, dcc, Input, Output, State, dash_table, callback_context
 import pandas as pd
-import io
+import io,json
 import base64
 
 # Импорт ранее созданных классов
 from data_viewer import DataViewer
-from tools import Cleaner
-from tools import Normalizer
 from visualizer import Visualizer
 
 
@@ -54,13 +52,6 @@ class DataInsightApp:
 
             # Вкладки для работы с данными
             dbc.Tabs([
-                dbc.Tab(label="Просмотр данных", children=[
-                    dbc.Row([
-                        dbc.Col([
-                            html.Div(id='dataset-preview')
-                        ])
-                    ])
-                ]),
                 dbc.Tab(label="Редактирование данных", children=[
                     dbc.Row([
                         dbc.Col([
@@ -128,11 +119,13 @@ class DataInsightApp:
                             ),
                             dcc.Dropdown(
                                 id='x-axis-column',
-                                placeholder="Выберите колонку для X"
+                                placeholder="Выберите колонку для X",
+                                style={'display': 'none'}
                             ),
                             dcc.Dropdown(
                                 id='y-axis-column',
-                                placeholder="Выберите колонку для Y"
+                                placeholder="Выберите колонку для Y",
+                                style={'display': 'none'}
                             ),
                             dcc.Dropdown(
                                 id='z-axis-column',
@@ -185,7 +178,6 @@ class DataInsightApp:
 
         @self.app.callback(
             [Output('upload-status', 'children'),
-             Output('dataset-preview', 'children'),
              Output('x-axis-column', 'options'),
              Output('y-axis-column', 'options'),
              Output('z-axis-column', 'options', allow_duplicate=True)],
@@ -218,7 +210,6 @@ class DataInsightApp:
 
                     return (
                         f"Файл {filename} успешно загружен",
-                        preview_table,
                         column_options,
                         column_options,
                         column_options
@@ -234,19 +225,13 @@ class DataInsightApp:
 
                 return (
                     "Данные успешно обновлены",
-                    dbc.Table.from_dataframe(
-                        df_edited.head(10),
-                        striped=True,
-                        bordered=True,
-                        hover=True
-                    ),
                     column_options,
                     column_options,
                     column_options
                 )
 
             # Default return if no action is taken
-            return "Загрузите файл", None, [], [], []
+            return "Загрузите файл", [], [], []
 
         @self.app.callback(
             Output('analysis-results', 'children'),
@@ -260,15 +245,78 @@ class DataInsightApp:
 
             if analysis_type == 'overall':
                 analysis = viewer.analyze_overall()
-                return html.Pre(str(analysis))
+                return html.Div([
+                    html.H3("Общий обзор данных", className='mb-4'),
+                    html.Div([
+                        html.P(f"Общее количество строк: {analysis['shape'][0]}"),
+                        html.P(f"Общее количество столбцов: {analysis['shape'][1]}"),
+
+                        html.H4("Типы данных в столбцах:", className='mt-3'),
+                        html.Ul([
+                            html.Li(f"{col}: {dtype}") for col, dtype in analysis['dtypes'].items()
+                        ]),
+
+                        html.H4("Пропуски в данных:", className='mt-3'),
+                        html.Table([
+                            html.Thead(html.Tr(
+                                [html.Th("Столбец"), html.Th("Количество пропусков"), html.Th("Процент пропусков")])),
+                            html.Tbody([
+                                html.Tr([
+                                    html.Td(col),
+                                    html.Td(f"{analysis['missing_count'].get(col, 0)}"),
+                                    html.Td(f"{analysis['missing_percent'].get(col, 0):.2f}%")
+                                ]) for col in analysis['missing_count']
+                            ])
+                        ], className='table table-striped'),
+
+                        html.P(f"Количество дубликатов: {analysis['duplicates']}", className='mt-3 font-weight-bold')
+                    ])
+                ])
 
             elif analysis_type == 'statistical':
                 tests = viewer.statistical_tests()
-                return html.Pre(str(tests))
+                return html.Div([
+                    html.H3("Статистический анализ"),
+                    html.Table([
+                                   html.Tr([
+                                       html.Th("Столбец"),
+                                       html.Th("Тест Шапиро-Уилка"),
+                                       html.Th("Асимметрия"),
+                                       html.Th("Эксцесс")
+                                   ])
+                               ] + [
+                                   html.Tr([
+                                       html.Td(col),
+                                       html.Td(
+                                           f"{test['shapiro_test']['statistic']:.4f} ({'Нормальное' if test['shapiro_test']['is_normal_distribution'] else 'Не нормальное'})",
+                                           style={'color': 'green' if test['shapiro_test'][
+                                               'is_normal_distribution'] else 'red'}),
+                                       html.Td(f"{test['skewness']:.4f}"),
+                                       html.Td(f"{test['kurtosis']:.4f}")
+                                   ]) for col, test in tests.items()
+                               ], className='table table-striped')
+                ])
 
             elif analysis_type == 'correlation':
                 correlations = viewer.correlation_analysis()
-                return html.Pre(str(correlations))
+                return html.Div([
+                    html.H3("Корреляционный анализ"),
+                    html.Div([
+                        html.H4("Сильные корреляции"),
+                        html.Table([
+                                       html.Tr([html.Th("Столбцы"), html.Th("Значение корреляции"),
+                                                html.Th("Тип корреляции")])
+                                   ] + [
+                                       html.Tr([
+                                           html.Td(f"{corr['columns'][0]} - {corr['columns'][1]}"),
+                                           html.Td(f"{corr['correlation']:.4f}"),
+                                           html.Td(corr['correlation_type'],
+                                                   style={'color': 'green' if corr[
+                                                                                  'correlation_type'] == 'positive' else 'red'})
+                                       ]) for corr in correlations['strong_correlations']
+                                   ], className='table table-striped')
+                    ])
+                ])
 
         @self.app.callback(
             [Output('x-axis-column', 'style'),

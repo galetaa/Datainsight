@@ -1,6 +1,7 @@
-import pandas as pd
-import numpy as np
 from typing import Dict, Any, List
+
+import numpy as np
+import pandas as pd
 import scipy.stats as stats
 
 
@@ -9,14 +10,12 @@ class DataViewer:
         self.df = df
 
     def analyze_overall(self) -> Dict[str, Any]:
-        """Общая информация о датасете."""
         info = {
-            "shape": self.df.shape,
-            "columns": list(self.df.columns),
-            "dtypes": self.df.dtypes.apply(lambda x: str(x)).to_dict(),
-            "missing_count": self.df.isna().sum().to_dict(),
-            "missing_percent": (self.df.isna().mean() * 100).to_dict(),
-            "duplicates": self.df.duplicated().sum()
+            "shape": list(self.df.shape),  # Преобразуем tuple в list
+            "dtypes": {col: str(dtype) for col, dtype in self.df.dtypes.items()},  # Преобразуем типы в строки
+            "missing_count": {col: int(count) for col, count in self.df.isna().sum().items()},
+            "missing_percent": {col: float(percent) for col, percent in (self.df.isna().mean() * 100).items()},
+            "duplicates": int(self.df.duplicated().sum())  # Преобразуем в целое число
         }
         return info
 
