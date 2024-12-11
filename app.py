@@ -14,7 +14,7 @@ from visualizer import Visualizer
 
 class DataInsightApp:
     def __init__(self):
-        self.app = dash.Dash(__name__,prevent_initial_callbacks=True,
+        self.app = dash.Dash(__name__, prevent_initial_callbacks=True,
                              external_stylesheets=[dbc.themes.BOOTSTRAP],
                              suppress_callback_exceptions=True)
         self.current_dataframe = None
@@ -113,7 +113,16 @@ class DataInsightApp:
                                     {'label': 'Гистограмма', 'value': 'histogram'},
                                     {'label': 'Scatter', 'value': 'scatter'},
                                     {'label': 'Линейный', 'value': 'line'},
-                                    {'label': '3D Scatter', 'value': 'scatter3d'}
+                                    {'label': '3D Scatter', 'value': 'scatter3d'},
+                                    {'label': 'KDE', 'value': 'kde'},
+                                    {'label': 'Распределение', 'value': 'distribution'},
+                                    {'label': 'Столбчатый', 'value': 'bar'},
+                                    {'label': 'Площадь', 'value': 'area'},
+                                    {'label': 'Коробчатый', 'value': 'box'},
+                                    {'label': 'Скрипичный', 'value': 'violin'},
+                                    {'label': 'Поверхность', 'value': 'surface'},
+                                    {'label': 'Контур', 'value': 'contour'},
+                                    {'label': 'Тепловая карта', 'value': 'heatmap'}
                                 ],
                                 placeholder="Выберите тип графика"
                             ),
@@ -179,7 +188,7 @@ class DataInsightApp:
              Output('dataset-preview', 'children'),
              Output('x-axis-column', 'options'),
              Output('y-axis-column', 'options'),
-             Output('z-axis-column', 'options',allow_duplicate=True)],
+             Output('z-axis-column', 'options', allow_duplicate=True)],
             [Input('upload-data', 'contents'),
              Input('save-changes-btn', 'n_clicks')],
             [State('upload-data', 'filename'),
@@ -262,17 +271,45 @@ class DataInsightApp:
                 return html.Pre(str(correlations))
 
         @self.app.callback(
-            [Output('z-axis-column', 'options',allow_duplicate=True),
-             Output('z-axis-column', 'style',allow_duplicate=True)],
+            [Output('x-axis-column', 'style'),
+             Output('y-axis-column', 'style'),
+             Output('z-axis-column', 'style')],
             [Input('visualization-type-dropdown', 'value')]
         )
-        def toggle_z_axis(vis_type):
-            if vis_type in ['scatter3d', 'surface', 'contour', 'heatmap']:
-                return (
-                    [{'label': col, 'value': col} for col in self.current_dataframe.columns],
-                    {'display': 'block'}
-                )
-            return [], {'display': 'none'}
+        def toggle_axis_columns(vis_type):
+            # Default hidden state for all columns
+            x_style = {'display': 'none'}
+            y_style = {'display': 'none'}
+            z_style = {'display': 'none'}
+
+            # Mapping of visualization types to required axes
+            axis_requirements = {
+                'histogram': {'x': True},
+                'kde': {'x': True},
+                'distribution': {'x': True},
+                'scatter': {'x': True, 'y': True},
+                'line': {'x': True, 'y': True},
+                'bar': {'x': True, 'y': True},
+                'area': {'x': True, 'y': True},
+                'box': {'x': True, 'y': True},
+                'violin': {'x': True, 'y': True},
+                'scatter3d': {'x': True, 'y': True, 'z': True},
+                'surface': {'z': True},
+                'contour': {'z': True},
+                'heatmap': {'z': True}
+            }
+
+            # Show/hide columns based on visualization type
+            if vis_type in axis_requirements:
+                req = axis_requirements[vis_type]
+                if req.get('x', False):
+                    x_style = {'display': 'block'}
+                if req.get('y', False):
+                    y_style = {'display': 'block'}
+                if req.get('z', False):
+                    z_style = {'display': 'block'}
+
+            return x_style, y_style, z_style
 
         @self.app.callback(
             Output('visualization-output', 'figure'),
@@ -367,7 +404,6 @@ class DataInsightApp:
 
             plot_func = visualization_mapping.get(vis_type)
             return plot_func() if plot_func else {}
-
 
     def run(self, debug=True):
         self.app.run_server(debug=debug)

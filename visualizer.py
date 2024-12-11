@@ -314,27 +314,57 @@ class Visualizer:
         """
         Применение интерактивных настроек к графику
         """
-        if not self.interactive_settings['zoom']:
-            fig.update_layout(dragmode=False)
+        try:
+            # Отключение зума
+            if not self.interactive_settings['zoom']:
+                fig.update_layout(dragmode=False)
 
-        if self.interactive_settings['hover_info']:
-            fig.update_traces(hovertemplate='%{x}, %{y}<extra></extra>')
+            # Настройка информации при наведении
+            if self.interactive_settings['hover_info']:
+                fig.update_traces(hovertemplate='%{x}, %{y}<extra></extra>')
 
-        # Настройка темы
-        fig.update_layout(
-            template=self.interactive_settings['theme'],
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
+            # Настройка темы
+            fig.update_layout(
+                template=self.interactive_settings['theme'],
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
 
-        # Цветовая схема
-        color_scales = {
-            'default': None,
-            'viridis': 'Viridis',
-            'plasma': 'Plasma',
-            'inferno': 'Inferno'
-        }
-        if self.interactive_settings['color_scale'] in color_scales:
-            fig.update_traces(marker=dict(colorscale=color_scales[self.interactive_settings['color_scale']]))
+            # Цветовая схема
+            color_scales = {
+                'default': None,
+                'viridis': 'Viridis',
+                'plasma': 'Plasma',
+                'inferno': 'Inferno'
+            }
+
+            # Получаем тип первого следа
+            trace_type = fig.data[0].type if fig.data else None
+            color_scale = self.interactive_settings.get('color_scale')
+
+            # Применение цветовой схемы с учетом типа графика
+            if color_scale in color_scales:
+                color_value = color_scales[color_scale]
+
+                # Словарь для разных типов графиков
+                color_settings = {
+                    'scatter': dict(marker=dict(colorscale=color_value)),
+                    'scatter3d': dict(marker=dict(colorscale=color_value)),
+                    'histogram': dict(marker=dict(color=color_value)),
+                    'histogram2d': dict(marker=dict(color=color_value)),
+                    'histogram2dcontour': dict(marker=dict(color=color_value)),
+                    'box': dict(marker=dict(color=color_value)),
+                    'violin': dict(marker=dict(color=color_value)),
+                    'heatmap': dict(colorscale=color_value),
+                    'surface': dict(colorscale=color_value),
+                    'contour': dict(colorscale=color_value)
+                }
+
+                # Применяем настройки, если тип графика поддерживается
+                if trace_type in color_settings:
+                    fig.update_traces(**color_settings[trace_type])
+
+        except Exception as e:
+            print(f"Ошибка в apply_interactive_settings: {e}")
 
         return fig
 
