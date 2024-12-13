@@ -5,17 +5,6 @@ import pandas as pd
 
 
 def get_delimiter(file_name, max_sample_lines=10):
-    """
-    Detect the delimiter used in an SV (separator value) file.
-
-    Parameters:
-    file_name (str): Path to the SV file.
-    max_sample_lines (int): The maximum number of lines to sample for delimiter detection.
-
-    Returns:
-    str: The detected delimiter.
-    """
-
     with open(file_name, 'r', encoding='utf-8', errors='ignore') as file:
         lines = file.readlines(max_sample_lines)
         delimiters = [',', '\t', ';', '|', ' ']
@@ -30,17 +19,6 @@ def get_delimiter(file_name, max_sample_lines=10):
 
 
 def are_excel_headers_vertical(file_path, rows_to_read=1000, cols_to_read=1000):
-    """
-    Определяет, расположены ли заголовки вертикально в части файла Excel.
-
-    Parameters:
-    file_path (str): Путь к файлу Excel (xlsx или xls).
-    rows_to_read (int): Количество строк для чтения и анализа.
-    cols_to_read (int): Количество столбцов для чтения и анализа.
-
-    Returns:
-    bool: True, если заголовки расположены вертикально, иначе False.
-    """
     # Чтение указанной части файла без предполагаемых заголовков
     df = pd.read_excel(file_path, header=None, nrows=rows_to_read, usecols=list(range(cols_to_read)))
 
@@ -58,16 +36,6 @@ def are_excel_headers_vertical(file_path, rows_to_read=1000, cols_to_read=1000):
 
 
 def determine_json_orientation_from_file(file_path, lines_to_read=10):
-    """
-    Определяет ориентацию части файла JSON.
-
-    Parameters:
-    file_path (str): Путь к файлу JSON.
-    lines_to_read (int): Количество строк, которые будут прочитаны для анализа.
-
-    Returns:
-    str: Ориентация JSON ('split', 'records', 'index', 'unknown', 'invalid JSON').
-    """
     try:
         with open(file_path, 'r') as file:
             # Чтение заданного количества строк из файла

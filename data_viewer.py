@@ -11,11 +11,26 @@ class DataViewer:
 
     def analyze_overall(self) -> Dict[str, Any]:
         info = {
-            "shape": list(self.df.shape),  # Преобразуем tuple в list
-            "dtypes": {col: str(dtype) for col, dtype in self.df.dtypes.items()},  # Преобразуем типы в строки
+            # Существующие поля
+            "shape": list(self.df.shape),
+            "dtypes": {col: str(dtype) for col, dtype in self.df.dtypes.items()},
             "missing_count": {col: int(count) for col, count in self.df.isna().sum().items()},
             "missing_percent": {col: float(percent) for col, percent in (self.df.isna().mean() * 100).items()},
-            "duplicates": int(self.df.duplicated().sum())  # Преобразуем в целое число
+            "duplicates": int(self.df.duplicated().sum()),
+
+            # Новые поля
+            "memory_usage": {
+                "total": self.df.memory_usage(deep=True).sum() / 1024 / 1024,  # в МБ
+                "per_column": {col: self.df[col].memory_usage(deep=True) / 1024 / 1024 for col in self.df.columns}
+            },
+            "categorical_columns": list(self.df.select_dtypes(include=['object', 'category']).columns),
+            "unique_values_count": {col: self.df[col].nunique() for col in self.df.columns},
+            "value_ranges": {
+                col: {
+                    "min": self.df[col].min() if pd.api.types.is_numeric_dtype(self.df[col]) else None,
+                    "max": self.df[col].max() if pd.api.types.is_numeric_dtype(self.df[col]) else None
+                } for col in self.df.columns
+            }
         }
         return info
 
@@ -185,16 +200,7 @@ class DataViewer:
         return result
 
     def sort_dataframe(self, column: str, ascending: bool = True) -> pd.DataFrame:
-        """
-        Сортировка DataFrame по выбранному столбцу
 
-        Args:
-            column (str): Столбец для сортировки
-            ascending (bool): Направление сортировки
-
-        Returns:
-            pd.DataFrame: Отсортированный DataFrame
-        """
         if column not in self.df.columns:
             raise ValueError(f"Столбец {column} не найден")
 
@@ -203,94 +209,102 @@ class DataViewer:
         return sorted_df
 
     def apply_sorting(self, column: str, ascending: bool = True):
-        """
-        Применение сортировки к текущему DataFrame
-        """
+
         self.df = self.sort_dataframe(column, ascending)
 
     def statistical_tests(self, columns: List[str] = None) -> Dict[str, Any]:
-        """
-        Проведение статистических тестов для числовых колонок
-
-        Args:
-            columns (List[str], optional): Список колонок для тестирования.
-                Если None, используются все числовые колонки.
-
-        Returns:
-            Dict с результатами статистических тестов
-        """
         if columns is None:
             columns = self.df.select_dtypes(include=['float64', 'int64']).columns
 
         test_results = {}
 
         for col in columns:
+            # Инициализируем словарь для каждого столбца
+            test_results[col] = {}
+
+            # Очищаем данные от пропусков
+            clean_data = self.df[col].dropna()
+
+            if len(clean_data) == 0:
+                test_results[col] = {
+                    'error': 'Недостаточно данных для анализа'
+                }
+                continue
+
             # Тест Шапиро-Уилка на нормальность распределения
-            _, shapiro_p = stats.shapiro(self.df[col].dropna())
+            try:
+                _, shapiro_p = stats.shapiro(clean_data)
+            except Exception as e:
+                shapiro_p = None
 
-            # Тест на асимметричность и эксцесс
-            skewness = stats.skew(self.df[col].dropna())
-            kurtosis = stats.kurtosis(self.df[col].dropna())
+            # Статистические показатели
+            try:
+                skewness = stats.skew(clean_data)
+                kurtosis = stats.kurtosis(clean_data)
 
-            test_results[col] = {
-                'shapiro_test': {
-                    'statistic': shapiro_p,
-                    'is_normal_distribution': shapiro_p > 0.05
-                },
-                'skewness': skewness,
-                'kurtosis': kurtosis
-            }
+                # Квартили
+                q1, q2, q3 = clean_data.quantile([0.25, 0.5, 0.75])
+                iqr = q3 - q1
+
+                test_results[col] = {
+                    'shapiro_test': {
+                        'statistic': shapiro_p,
+                        'is_normal_distribution': shapiro_p > 0.05 if shapiro_p is not None else None
+                    },
+                    'skewness': skewness,
+                    'kurtosis': kurtosis,
+                    'quartiles': {
+                        'Q1': q1,
+                        'median': q2,
+                        'Q3': q3,
+                        'IQR': iqr
+                    }
+                }
+            except Exception as e:
+                test_results[col] = {
+                    'error': str(e)
+                }
 
         return test_results
 
     def correlation_analysis(self, method: str = 'pearson') -> Dict[str, Any]:
-        """
-        Корреляционный анализ для числовых колонок
-
-        Args:
-            method (str): Метод корреляции - 'pearson', 'spearman', 'kendall'
-
-        Returns:
-            Dict с результатами корреляционного анализа
-        """
         numeric_columns = self.df.select_dtypes(include=['float64', 'int64']).columns
 
-        # Корреляционная матрица
-        corr_matrix = self.df[numeric_columns].corr(method=method)
+        # Корреляционные матрицы
+        corr_matrices = {
+            'pearson': self.df[numeric_columns].corr(method='pearson'),
+            'spearman': self.df[numeric_columns].corr(method='spearman'),
+            'kendall': self.df[numeric_columns].corr(method='kendall')
+        }
 
         # Поиск сильных корреляций
         strong_correlations = []
-        for i in range(len(numeric_columns)):
-            for j in range(i + 1, len(numeric_columns)):
-                col1, col2 = numeric_columns[i], numeric_columns[j]
-                corr_value = corr_matrix.loc[col1, col2]
+        for matrix_type, corr_matrix in corr_matrices.items():
+            matrix_correlations = []
+            for i in range(len(numeric_columns)):
+                for j in range(i + 1, len(numeric_columns)):
+                    col1, col2 = numeric_columns[i], numeric_columns[j]
+                    corr_value = corr_matrix.loc[col1, col2]
 
-                if abs(corr_value) > 0.7:  # Порог сильной корреляции
-                    strong_correlations.append({
-                        'columns': (col1, col2),
-                        'correlation': corr_value,
-                        'correlation_type': 'positive' if corr_value > 0 else 'negative'
-                    })
+                    if abs(corr_value) > 0.7:
+                        matrix_correlations.append({
+                            'columns': (col1, col2),
+                            'correlation': corr_value,
+                            'correlation_type': 'positive' if corr_value > 0 else 'negative',
+                            'matrix_type': matrix_type.capitalize()
+                        })
+
+            strong_correlations.extend(matrix_correlations)
 
         return {
-            'correlation_matrix': corr_matrix.to_dict(),
+            'correlation_matrices': {k: v.to_dict() for k, v in corr_matrices.items()},
             'strong_correlations': strong_correlations
         }
 
     def hypothesis_testing(self, column1: str, column2: str = None) -> Dict[str, Any]:
-        """
-        Статистические гипотезы и тесты для одной или двух колонок
-
-        Args:
-            column1 (str): Первая колонка
-            column2 (str, optional): Вторая колонка для сравнения
-
-        Returns:
-            Dict с результатами тестирования гипотез
-        """
         results = {}
 
-        # Одновыборочный t-тест
+        # Существующие тесты
         if column2 is None:
             t_statistic, p_value = stats.ttest_1samp(self.df[column1].dropna(), popmean=0)
             results['one_sample_ttest'] = {
@@ -298,8 +312,6 @@ class DataViewer:
                 'p_value': p_value,
                 'null_hypothesis_rejected': p_value < 0.05
             }
-
-        # Двухвыборочный t-тест
         else:
             t_statistic, p_value = stats.ttest_ind(
                 self.df[column1].dropna(),
@@ -310,6 +322,30 @@ class DataViewer:
                 'p_value': p_value,
                 'null_hypothesis_rejected': p_value < 0.05,
                 'mean_difference_significant': p_value < 0.05
+            }
+
+        # Дополнительные статистические тесты
+        if column2:
+            # Тест Манна-Уитни (непараметрический)
+            u_statistic, u_p_value = stats.mannwhitneyu(
+                self.df[column1].dropna(),
+                self.df[column2].dropna()
+            )
+            results['mann_whitney_test'] = {
+                'u_statistic': u_statistic,
+                'p_value': u_p_value,
+                'statistically_significant': u_p_value < 0.05
+            }
+
+            # Тест Левене для проверки однородности дисперсий
+            levene_statistic, levene_p_value = stats.levene(
+                self.df[column1].dropna(),
+                self.df[column2].dropna()
+            )
+            results['levene_test'] = {
+                'levene_statistic': levene_statistic,
+                'p_value': levene_p_value,
+                'variances_equal': levene_p_value > 0.05
             }
 
         return results
