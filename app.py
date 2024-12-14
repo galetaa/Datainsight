@@ -4,10 +4,12 @@ from dash import html, dcc, Input, Output, State, dash_table, callback_context
 import pandas as pd
 import io, json
 import base64
-from scipy import stats
-# Импорт ранее созданных классов
+
 from data_viewer import DataViewer
 from visualizer import Visualizer
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 class DataInsightApp:
@@ -191,6 +193,11 @@ class DataInsightApp:
             ctx = callback_context
             triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
+            logging.debug(f"Triggered ID: {triggered_id}")
+            logging.debug(f"Contents: {contents}")
+            logging.debug(f"Filename: {filename}")
+            logging.debug(f"Edited Data: {edited_data}")
+
             # Handle file upload
             if triggered_id == 'upload-data' and contents is not None:
                 df = self.parse_contents(contents, filename)
@@ -217,7 +224,7 @@ class DataInsightApp:
                     )
 
             # Handle save changes
-            elif triggered_id == 'save-changes-btn' and n_clicks and edited_data:
+            elif triggered_id == 'save-changes-btn' and n_clicks:
                 df_edited = pd.DataFrame(edited_data)
                 self.current_dataframe = df_edited
 
@@ -868,12 +875,13 @@ class DataInsightApp:
 
         @self.app.callback(
             Output('visualization-output', 'figure'),
-            [Input('visualization-type-dropdown', 'value'),
+            [Input('save-changes-btn', 'n_clicks'),
+             Input('visualization-type-dropdown', 'value'),
              Input('x-axis-column', 'value'),
              Input('y-axis-column', 'value'),
              Input('z-axis-column', 'value')]
         )
-        def update_visualization(vis_type, x_column, y_column, z_column):
+        def update_visualization(n_clicks, vis_type, x_column, y_column, z_column):
             if self.current_dataframe is None or x_column is None:
                 return {}
 
